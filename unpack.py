@@ -19,6 +19,7 @@ import re
 import pylegu
 from legu_hashmap import LeguHashmap
 from legu_packed_file import LeguPackedFile
+from pyucl import ucl
 
 
 _LIBSHELL_RE = re.compile(r"libshell\w-([\d\.]+).so")
@@ -121,7 +122,7 @@ def legu_unpack(apk_path: str):
     for idx, packed_dex in enumerate(legu_main_data.packed_dex):
         print(f"[+] dex {idx:d} compressed size:   0x{packed_dex.compressed_size:x}")
         print(f"[+] dex {idx:d} uncompressed size: 0x{packed_dex.uncompressed_size:x}")
-        uncompressed = pylegu.nrv_decompress(list(packed_dex.data), packed_dex.uncompressed_size + 0x400)
+        uncompressed = list(ucl.nrv2d_decompress(bytes(packed_dex.data), packed_dex.uncompressed_size + 0x400))
         uncompressed_dex_files.append(io.BytesIO(bytes(uncompressed)[0x10:]))
 
     print(f"\n[+] Unpacking #{legu_main_data.nb_dex_files:d} hashmap ...")
@@ -129,7 +130,7 @@ def legu_unpack(apk_path: str):
         print(f"[+] hashmap {idx:d} compressed size:   0x{hashmap.compressed_size:x}")
         print(f"[+] hashmap {idx:d} uncompressed size: 0x{hashmap.uncompressed_size:x}")
         uncrypted = decrypt(hashmap.data, password)
-        uncompressed = pylegu.nrv_decompress(list(uncrypted), hashmap.uncompressed_size + 0x400)
+        uncompressed = ucl.nrv2d_decompress(bytes(uncrypted), hashmap.uncompressed_size + 0x400)
         hasmaps.append(io.BytesIO(bytes(uncompressed)))
 
     print(f"\n[+] Unpacking #{legu_main_data.nb_dex_files:d} packed methods ...")
@@ -137,7 +138,7 @@ def legu_unpack(apk_path: str):
         print(f"[+] packed methods {idx:d} compressed_size:   0x{packedmethods.compressed_size:x}")
         print(f"[+] packed methods {idx:d} uncompressed_size: 0x{packedmethods.uncompressed_size:x}")
         uncrypted = decrypt(packedmethods.data, password)
-        uncompressed = pylegu.nrv_decompress(list(uncrypted), packedmethods.uncompressed_size + 0x400)
+        uncompressed = ucl.nrv2d_decompress(bytes(uncrypted), packedmethods.uncompressed_size + 0x400)
         packed_methods_files.append(io.BytesIO(bytes(uncompressed)))
 
     print("\n[+] Stage 2: Patching DEX files")

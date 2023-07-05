@@ -7,12 +7,13 @@
 #
 # Author: Romain Thomas - @rh0main
 #################################################
+from __future__ import annotations
 import sys
 import argparse
 from itertools import cycle
 import lief
 import io
-from typing import Optional
+from typing import Callable, Optional
 import zipfile
 import re
 
@@ -25,11 +26,38 @@ from Cryptodome.Cipher import ChaCha20 #pip install pycryptodomex
 _LIBSHELL_RE = re.compile(r"libshell\w-([\d\.]+).so")
 MASK32 = (1 << 32) - 1
 
-SUPPORTED_VERSION = {"4.1.0.15", "4.1.0.18", "4.1.0.31"}
-CHACHA_VERSIONS = {"4.1.0.31"}
 
-KEY  = b"^hHc7Ql]N9Z4:+1m~nTcA&3a7|?GB1z@"
-""" Hard coded key located in the native library libshell-super.2019.so """
+class Decryptor:
+    def decrypt(self, data: bytes, password: bytes) -> bytes:
+        raise NotImplementedError()
+    @classmethod
+    def from_decrypt_and_keyderive(cls, decrypt:Callable[[bytes,bytes],bytes], keyderive:Callable[[bytes],bytes]):
+        class DecryptorImpl(Decryptor):
+            def decrypt(self, data: bytes, password: bytes) -> bytes:
+                return decrypt(data, keyderive(password))
+        return DecryptorImpl()
+    
+    @classmethod
+    def try_all(cls, decryptors:list[Decryptor], test_decryption_suceeded:Callable[[bytes],bool]):
+        class DecryptorImpl(Decryptor):
+            def __init__(self) -> None:
+                self.decryptors=decryptors
+                self.working_decryptor:Optional[Decryptor]=None
+                super().__init__()
+            def decrypt(self, data: bytes, password: bytes) -> bytes:
+                
+                if self.working_decryptor is not None:
+                    return self.working_decryptor.decrypt(data, password)
+                
+                for d in self.decryptors:
+                    try:
+                        decryption = d.decrypt(data, password)
+                        if test_decryption_suceeded(decryption):
+                            self.working_decryptor=d
+                            return decryption
+                    except: continue
+                raise RuntimeError("No decryptor worked")
+        return DecryptorImpl()
 
 def key_derivation_v31(password: bytes) -> bytes:
     """
@@ -44,33 +72,29 @@ def key_derivation_v31(password: bytes) -> bytes:
     XOR_WITH_SECOND_STEP_2=b"~nTcA&3a7|?GB1z@"
     return bytes(x1 ^ x2 for x1, x2 in zip(XOR_WITH_SECOND_STEP_1+XOR_WITH_SECOND_STEP_2, step_1+step_1))
 
-def key_derivation(key: bytes) -> bytes:
+def key_derivation_v15_v18(password: bytes) -> bytes:
     """
     Routine to derive the decryption key used in XTEA
     """
-    return bytes(x1 ^ x2 for x1, x2 in zip(KEY, cycle(key)))
+    KEY  = b"^hHc7Ql]N9Z4:+1m~nTcA&3a7|?GB1z@"
+    return bytes(x1 ^ x2 for x1, x2 in zip(KEY, cycle(password)))
 
-def decrypt(buff: bytes, password: bytes, using_chacha=False) -> bytes:
-    """
-    Decrypt the buffer
-    """
-    if using_chacha:
-        key=key_derivation_v31(password)
-        HARDCODED_NONCE=b'nzbnhgaf'
-        return chacha20_decrypt(buff, key, HARDCODED_NONCE)
-    
+V31_NONCE = b'nzbnhgaf'
+
+def get_decrypt_chacha_with_nonce(nonce):
+    def decrypt_chacha(buff: bytes, key: bytes) -> bytes:
+        return ChaCha20.new(key=key, nonce=nonce).decrypt(buff)
+    return decrypt_chacha
+
+def decrypt_xtea(buff: bytes, key: bytes):
     limit = len(buff) & 0xFFFFFFF8
     aligned_buff = list(int.from_bytes(buff[i:i+4], byteorder='little') for i in range(0, limit, 4))
-    ekey = key_derivation(password)
-    ekey_as_u32 = [int.from_bytes(ekey[i:i+4], byteorder='little') for i in range(0, len(ekey), 4)]
+    key_as_u32 = [int.from_bytes(key[i:i+4], byteorder='little') for i in range(0, len(key), 4)]
     nb_round = 3
-    xtea_decrypt(ekey_as_u32, aligned_buff, len(aligned_buff)*4, nb_round)
+    xtea_decrypt(key_as_u32, aligned_buff, len(aligned_buff)*4, nb_round)
     uncrypted = [val.to_bytes(4, byteorder='little') for val in aligned_buff] + [val.to_bytes(1, byteorder='little') for val in buff[limit:]]
     return b''.join(uncrypted)
 
-
-def chacha20_decrypt(buff: bytes, key: bytes, nonce: bytes) -> bytes:
-    return ChaCha20.new(key=key, nonce=nonce).decrypt(buff)
 
 def xtea_decrypt(key, buf, ilen, nb_round):
     count = ilen // 8
@@ -98,6 +122,30 @@ def xtea_decrypt(key, buf, ilen, nb_round):
         buf[i + 1] = temp1
     return 0
 
+decryptor_v15_v18 = Decryptor.from_decrypt_and_keyderive(decrypt_xtea, key_derivation_v15_v18)
+decryptor_v31 = Decryptor.from_decrypt_and_keyderive(get_decrypt_chacha_with_nonce(V31_NONCE), key_derivation_v31)
+
+def test_nrv2d_decompression(buffer:bytes)->bool:
+    if len(buffer)>=0x200:
+        try:
+            ucl.nrv2d_decompress(buffer[:0x200], 0x4000)
+        except Exception as e:
+            return "-201" in str(e) #indicates that the decryption was working up until it hit the end of the buffer, so presumably it's correct
+        
+    else: #since the buffer is small we'll just try to decrypt the whole thing
+        try:
+            ucl.nrv2d_decompress(buffer, 0x4000)
+        except: return False
+    return True
+    
+decryptor_unknown_version = Decryptor.try_all([decryptor_v15_v18, decryptor_v31], test_nrv2d_decompression) 
+
+decryptors_by_version = {
+    "4.1.0.15":decryptor_v15_v18,
+    "4.1.0.18":decryptor_v15_v18,
+    "4.1.0.31":decryptor_v31,
+}
+    
 
 def dvmComputeUtf8Hash(clazz: str) -> int:
     """
@@ -129,7 +177,7 @@ def should_process_method(meth: lief.DEX.Method) -> bool:
     return meth.code_offset > 0 and len(meth.bytecode) > 0
 
 
-def legu_unpack(apk_path: str, use_chacha: bool = False):
+def legu_unpack(apk_path: str):
     """
     Unpacking routine
     """
@@ -141,13 +189,11 @@ def legu_unpack(apk_path: str, use_chacha: bool = False):
                 found = True
                 version = matches[0]
                 print(f"[+] Legu version: {version}")
-                if version not in SUPPORTED_VERSION:
+                if version not in decryptors_by_version.keys():
                     print(f"[*] /!\ This version may not be supported! We will try to decrypt anyway")
-                    if not use_chacha:
-                        print("You can use the --chacha option to try the ChaCha20 algorithm instead of XTEA")
+                    decryptor=decryptor_unknown_version
                 else:
-                    if version in CHACHA_VERSIONS:
-                        use_chacha = True
+                    decryptor = decryptors_by_version[version]
                 break
 
         if not found:
@@ -184,7 +230,7 @@ def legu_unpack(apk_path: str, use_chacha: bool = False):
     for idx, hashmap in enumerate(legu_main_data.hashmaps):
         print(f"[+] hashmap {idx:d} compressed size:   0x{hashmap.compressed_size:x}")
         print(f"[+] hashmap {idx:d} uncompressed size: 0x{hashmap.uncompressed_size:x}")
-        uncrypted = decrypt(hashmap.data, password, use_chacha)
+        uncrypted = decryptor.decrypt(hashmap.data, password)
         uncompressed = ucl.nrv2d_decompress(bytes(uncrypted), hashmap.uncompressed_size + 0x400)
         hasmaps.append(io.BytesIO(bytes(uncompressed)))
 
@@ -192,7 +238,7 @@ def legu_unpack(apk_path: str, use_chacha: bool = False):
     for idx, packedmethods in enumerate(legu_main_data.packed_bytecode):
         print(f"[+] packed methods {idx:d} compressed_size:   0x{packedmethods.compressed_size:x}")
         print(f"[+] packed methods {idx:d} uncompressed_size: 0x{packedmethods.uncompressed_size:x}")
-        uncrypted = decrypt(packedmethods.data, password, use_chacha)
+        uncrypted = decryptor.decrypt(packedmethods.data, password)
         uncompressed = ucl.nrv2d_decompress(bytes(uncrypted), packedmethods.uncompressed_size + 0x400)
         packed_methods_files.append(io.BytesIO(bytes(uncompressed)))
 
@@ -246,7 +292,7 @@ def legu_unpack(apk_path: str, use_chacha: bool = False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Legu/Tencent unpacker')
     parser.add_argument('apk', help='Path to the packed APK')
-    parser.add_argument('--chacha', action='store_true', help='Attempt to decrypt with Chacha20')
+
 
     args = parser.parse_args()
-    legu_unpack(args.apk, args.chacha)
+    legu_unpack(args.apk)

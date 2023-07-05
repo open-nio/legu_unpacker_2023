@@ -59,18 +59,23 @@ class Decryptor:
                 raise RuntimeError("No decryptor worked")
         return DecryptorImpl()
 
+def key_derivation_v20(password: bytes) -> bytes:
+    XOR_WITH = b'ix&trw1Vcl<u-oltlSK=m0z9p.+tsFbj'
+    return bytes(x1 ^ x2 for x1, x2 in zip(XOR_WITH, password+password))
+    
+    
+
 def key_derivation_v31(password: bytes) -> bytes:
     """
     Derive the encryption key used for ChaCha20 in version 31
     """
-    # The first 16 bytes of the password are xored with a hardcoded value
-    XOR_WITH_FIRST_STEP=b"^o0o7ql]m8y5:+1m"
-    step_1=bytes(x1 ^ x2 for x1, x2 in zip(XOR_WITH_FIRST_STEP, password[:16]))
+    # The 16 bytes of the password are xored with a hardcoded value
+    XOR_WITH_FIRST_STEP = b"^o0o7ql]m8y5:+1m"
+    step_1 = bytes(x1 ^ x2 for x1, x2 in zip(XOR_WITH_FIRST_STEP, password[:16]))
 
-    # The key consists of the previous value xored seperately with two hardcoded values and concatenated
-    XOR_WITH_SECOND_STEP_1=b"^cHc7Ql]diso:+2m"
-    XOR_WITH_SECOND_STEP_2=b"~nTcA&3a7|?GB1z@"
-    return bytes(x1 ^ x2 for x1, x2 in zip(XOR_WITH_SECOND_STEP_1+XOR_WITH_SECOND_STEP_2, step_1+step_1))
+    # The key consists of the previous value repeated and then xored with a hardcoded value
+    XOR_WITH_SECOND_STEP = b"^cHc7Ql]diso:+2m~nTcA&3a7|?GB1z@"
+    return bytes(x1 ^ x2 for x1, x2 in zip(XOR_WITH_SECOND_STEP, step_1+step_1))
 
 def key_derivation_v15_v18(password: bytes) -> bytes:
     """
@@ -80,6 +85,7 @@ def key_derivation_v15_v18(password: bytes) -> bytes:
     return bytes(x1 ^ x2 for x1, x2 in zip(KEY, cycle(password)))
 
 V31_NONCE = b'nzbnhgaf'
+V20_NONCE = b'nzanhgaf'
 
 def get_decrypt_chacha_with_nonce(nonce):
     def decrypt_chacha(buff: bytes, key: bytes) -> bytes:
@@ -123,6 +129,7 @@ def xtea_decrypt(key, buf, ilen, nb_round):
     return 0
 
 decryptor_v15_v18 = Decryptor.from_decrypt_and_keyderive(decrypt_xtea, key_derivation_v15_v18)
+decryptor_v20 = Decryptor.from_decrypt_and_keyderive(get_decrypt_chacha_with_nonce(V20_NONCE), key_derivation_v20)
 decryptor_v31 = Decryptor.from_decrypt_and_keyderive(get_decrypt_chacha_with_nonce(V31_NONCE), key_derivation_v31)
 
 def test_nrv2d_decompression(buffer:bytes)->bool:
@@ -138,11 +145,12 @@ def test_nrv2d_decompression(buffer:bytes)->bool:
         except: return False
     return True
     
-decryptor_unknown_version = Decryptor.try_all([decryptor_v15_v18, decryptor_v31], test_nrv2d_decompression) 
+decryptor_unknown_version = Decryptor.try_all([decryptor_v15_v18, decryptor_v20, decryptor_v31], test_nrv2d_decompression) 
 
 decryptors_by_version = {
     "4.1.0.15":decryptor_v15_v18,
     "4.1.0.18":decryptor_v15_v18,
+    "4.1.0.20":decryptor_v20,
     "4.1.0.31":decryptor_v31,
 }
     

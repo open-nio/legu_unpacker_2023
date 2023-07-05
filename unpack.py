@@ -5,7 +5,8 @@
 # The APK protected by this packer are likely
 # to embed libshell-super.2019.so and libshella-4.1.0.XY.so
 #
-# Author: Romain Thomas - @rh0main
+# Original Author: Romain Thomas - @rh0main
+# Updated by: Yaakov Saxon - @ysaxon
 #################################################
 from __future__ import annotations
 import sys

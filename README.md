@@ -1,9 +1,9 @@
 # Legu Unpacker
 
 Scripts to unpack Android applications protected by Tencent Legu. It works with versions
-**4.1.0.15**, **4.1.0.18**, **4.1.0.20**, and **4.1.0.31** of Legu.
+**4.1.0.15**, **4.1.0.18**, **4.1.0.20**, and **4.1.0.31** of Legu, and is easily extensible to new key derivations and encryptions if you have an unsupported version.
 
-This is a fork of [legu_unpacker_2019](https://github.com/quarkslab/legu_unpacker_2019) by Romain Thomas, updated to add new encryption methods and keys, and replace dependencies that were difficult to get working on modern Python envs.
+This is a fork of [legu_unpacker_2019](https://github.com/quarkslab/legu_unpacker_2019) by Romain Thomas, updated to add new encryption methods and keys, and replace dependencies that were difficult to get working on modern Python installations.
 
 Original blog post: https://blog.quarkslab.com/a-glimpse-into-tencents-legu-packer.html
 

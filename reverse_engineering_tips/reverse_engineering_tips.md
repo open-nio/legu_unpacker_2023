@@ -12,26 +12,22 @@ All versions to date do a decryption using a key derived from a value stored in 
 
 ## Tools we'll be using:
 
-* Ghidra: https://ghidra-sre.org/
-* * control flow deflattening script: https://github.com/PAGalaxyLab/ghidra_scripts/blob/master/ollvm_deobf_fla.py
-
-* BinDiff: http://www.zynamics.com/bindiff.html
-* * Ghidra plugin: https://github.com/ubfx/BinDiffHelper
-
-* Frida: https://github.com/frida/frida
-
-
 ## Basic techniques
 
 There are two main techniques we can use to reverse engineer this, static and dynamic analysis.
 
-### Static Analysis
+### Static Analysis with Ghidra
 
 We'll be using the FOSS decompiler Ghidra for this.
+
+* Ghidra: https://ghidra-sre.org/
 
 After importing, opening, and autoanalysing (turn on agressive instruction finding) the binary in Ghidra, the first step is to find the right functions.
 
 This can be more difficult if starting from scratch, but an easier way is to run bindiff on the binary against a known version, and find the right functions that way.
+
+* BinDiff: http://www.zynamics.com/bindiff.html
+* Ghidra plugin: https://github.com/ubfx/BinDiffHelper
 
 (TODO: include binaries from some versions with known function addresses to run bindiff against)
 
@@ -49,9 +45,7 @@ Once you've decoded the strings, you can look for strings such as "unpoison" to 
 This one is interesting. You can read more about it elsewhere but essentially this takes the whole complex flowchart of a function and reshapes it into a single-loop state-machine, which makes it harder to see what's happening. There's a good script to fix this at https://github.com/PAGalaxyLab/ghidra_scripts/blob/master/ollvm_deobf_fla.py, though it tends to work better on the 64-bit version (as there's more address space to insert jumps), and also it only works where there is a single state variable being used, rather than where there is a seperate read-to and write-to state variable. You use the script by positioning your cursor on top of an assignment to the state var and then running the script.
 
 
-
-
-### Dynamic Analysis
+### Dynamic Analysis with Frida
 
 For this it's probably easiest to use an Android emulator / virtual device, unless the real device you are working is rooted.
 

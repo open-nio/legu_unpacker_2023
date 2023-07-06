@@ -160,7 +160,7 @@ Really the main function to focus on is the one that derives the final key.
 
 After applying the control flow deflattening, and changing types, you may be left with a function that is essentially readable. Or you might need to do some dynamic analysis. Either way, you want to make sure you know how that one works.
 
-### Wrapping up
+## Wrapping up
 
 Once you've determined the key derivation, the encryption method (presumably still ChaCha) and the nonce, you can add them to the script at `decryptors.py`.
 

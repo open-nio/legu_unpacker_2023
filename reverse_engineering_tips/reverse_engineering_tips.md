@@ -33,7 +33,9 @@ After importing, opening, and autoanalysing (turn on agressive instruction findi
 
 This can be more difficult if starting from scratch, but an easier way is to run bindiff on the binary against a known version, and find the right functions that way.
 
-(TODO: include binaries from some versions with known function addresses to run bindiff against)
+You can find bindiff at http://www.zynamics.com/bindiff.html, and a Ghidra plugin at https://github.com/ubfx/BinDiffHelper
+
+And I've included samples together with the important offsets to compare against at /reverse_engineering_tips/library_samples_for_bindiff/ of this repo.
 
 #### Deobfuscating the deobfuscator
 

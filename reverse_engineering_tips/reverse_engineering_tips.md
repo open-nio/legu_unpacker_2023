@@ -53,14 +53,51 @@ This one is interesting. You can read more about it elsewhere but essentially th
 
 
 
+
+
 ### Dynamic Analysis
+
+#### Virtual device setup
 
 For this it's probably easiest to use an Android emulator / virtual device, unless the real device you are working is rooted.
 
 Download Android Studio and make a virtual device.
 Use https://github.com/newbit1/rootAVD.git to root it, and then do a cold reboot of the device.
 
-Then go to https://github.com/frida/frida/releases and download the latest frida-server with the right architecture and put it onto the device..
+Then go to https://github.com/frida/frida/releases and download the latest frida-server with the right architecture and put it onto the device.
+You'll need to put it in a place where you can chmod +x it, which means /sdcard might not work. What worked for me was:
+```
+adb copy /path/to/frida-server /sdcard
+adb shell
+su
+mkdir /data/frida
+mv /sdcard/frida-server /data/frida
+chmod +x /data/frida
+```
+
+Then to get it working, you'll need to setup the networking to forward the ports:
+
+From your host device:
+```
+cat ~/.emulator_console_auth_token
+
+ncat --telnet localhost 5554 (or plain telnet if you have that)
+auth (the token from above)
+redir add tcp:27042:27042
+```
+Now in another terminal window:
+```
+adb shell
+su
+path/to/frida-server -l 10.0.2.15 27042
+```
+And now in a third terminal window, you can run any of the frida commands with `-R` and it should connect to the virtual device correctly. 
+
+#### Some workarounds if the apk isn't stable.
+
+In my case, the apk I was working with didn't actually run stably on my virtual device, since it was looking for other resources that I couldn't copy over, so it would quickly crash. It also didn't appear to immediately load the libshell module. What I did therefore was to first use `frida-trace -R -f com.the.classpath.of.my.apk` to find where it was crashing, and then insert all my hooks into a function that was called right before it crashed. To get the broadest possible trace you can use `-i *` though be aware it will take *quite a while* for it to generate hooks for *everything*. Or if you want to jump straight to what ultimately worked for me, you could just hook dlopen `-i "*dlopen"`. Then after you see which dlopen takes place immediately before the crash, you can put all your code into an if statement within the generated hookfile at `__handlers__/libdl.so/dlopen.js`. In my case this meant immediately that in the `onenter` method, I put a line `if (args[0].readUtf8String()=="/vendor/lib64/egl/libGLESv1_CM_emulation.so"){.........}` and then put all the rest of my code into those curly braces and just called `frida-trace` every time. You could also do the same thing with a normal Frida script and just manually hook `dlopen` at the top of your script and then hook from there and just call `frida` with that.
+
+#### How to use Frida to analyze the library
 
 You might well be able to just dump the decrypted dex files with various scripts online, but assuming you want to actually reverse engineer the encryption, don't take that easy way out.
 

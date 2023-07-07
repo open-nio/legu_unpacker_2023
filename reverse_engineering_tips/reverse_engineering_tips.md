@@ -12,22 +12,15 @@ All versions to date do a decryption using a key derived from a value stored in 
 
 ## Tools we'll be using:
 
-* Ghidra: https://ghidra-sre.org/
-* * control flow deflattening script: https://github.com/PAGalaxyLab/ghidra_scripts/blob/master/ollvm_deobf_fla.py
-
-* BinDiff: http://www.zynamics.com/bindiff.html
-* * Ghidra plugin: https://github.com/ubfx/BinDiffHelper
-
-* Frida: https://github.com/frida/frida
-
-
 ## Basic techniques
 
 There are two main techniques we can use to reverse engineer this, static and dynamic analysis.
 
-### Static Analysis
+### Static Analysis with Ghidra
 
 We'll be using the FOSS decompiler Ghidra for this.
+
+* Ghidra: https://ghidra-sre.org/
 
 After importing, opening, and autoanalysing (turn on agressive instruction finding) the binary in Ghidra, the first step is to find the right functions.
 
@@ -51,11 +44,7 @@ Once you've decoded the strings, you can look for strings such as "unpoison" to 
 This one is interesting. You can read more about it elsewhere but essentially this takes the whole complex flowchart of a function and reshapes it into a single-loop state-machine, which makes it harder to see what's happening. There's a good script to fix this at https://github.com/PAGalaxyLab/ghidra_scripts/blob/master/ollvm_deobf_fla.py, though it tends to work better on the 64-bit version (as there's more address space to insert jumps), and also it only works where there is a single state variable being used, rather than where there is a seperate read-to and write-to state variable. You use the script by positioning your cursor on top of an assignment to the state var and then running the script.
 
 
-
-
-
-
-### Dynamic Analysis
+### Dynamic Analysis with Frida
 
 #### Virtual device setup
 
@@ -199,7 +188,7 @@ Really the main function to focus on is the one that derives the final key.
 
 After applying the control flow deflattening, and changing types, you may be left with a function that is essentially readable. Or you might need to do some dynamic analysis. Either way, you want to make sure you know how that one works.
 
-### Wrapping up
+## Wrapping up
 
 Once you've determined the key derivation, the encryption method (presumably still ChaCha) and the nonce, you can add them to the script at `decryptors.py`.
 

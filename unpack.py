@@ -78,8 +78,8 @@ def legu_unpack(apk_path: str):
                 break
 
         if not found:
-            print("Unable to get the packer's version")
-            sys.exit(1)
+            print("[*] /!\ Unable to get the packer's version. We will try to decrypt anyway")
+            decryptor=decryptor_unknown_version
 
         # Contain the password to decrypt the hashmaps and the Dalvik bytecode
         with zf.open('assets/tosversion') as tosversion_fd:

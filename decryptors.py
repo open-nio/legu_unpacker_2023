@@ -2,6 +2,7 @@ from __future__ import annotations
 from itertools import cycle
 from typing import Callable, Optional
 from Cryptodome.Cipher import ChaCha20
+from pyucl import ucl
 
 class Decryptor:
     def decrypt(self, data: bytes, password: bytes) -> bytes:

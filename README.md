@@ -64,3 +64,22 @@ The unpacked DEX files are located in the ``unpacked.apk`` file.
 
 The apk file created will have incorrect checksums on the classes.dex, which jadx will complain about. You can either disable the checksum check in jadx, or you can do `apktool d unpacked.apk && apktool b unpacked` to fix the checksums. I had some trouble fixing the checksums programmatically in the script - if someone wants to figure that out and submit a pull request, I'd appreciate it.
 
+## Using docker
+
+**Building the container:**
+
+```
+docker build . -t legu-unpacker
+```
+
+**Running the container**
+
+```
+docker run -v "$(pwd)":/unpacker legu-unpacker python ./unpack.py ./samples/com.intotherain.voicechange.apk
+```
+
+**Deleting the docker image**
+
+```
+docker image rm legu-unpacker
+```

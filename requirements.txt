@@ -1,3 +1,10 @@
-pycryptodomex
-pyucl
-lief
+cffi==1.16.0
+cryptography==42.0.6
+kaitaistruct==0.10
+lief==0.14.1
+parse==1.6.5
+pycparser==2.22
+pycryptodomex==3.20.0
+pyparser==1.0
+pyucl==0.0
+setuptools==69.5.1

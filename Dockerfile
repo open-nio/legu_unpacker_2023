@@ -12,7 +12,7 @@ RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /opt
-RUN git clone https://github.com/lcsfelix/pyucl.git
+RUN git clone https://github.com/jap/pyucl.git
 WORKDIR /opt/pyucl
 RUN pip install -r requirements.txt
 RUN python setup.py build

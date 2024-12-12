@@ -3,6 +3,10 @@ name: Docker Image CI
 on:
   push:
     branches: [ "master" ]
+    
+permissions:
+  contents: read
+  packages: write
 
 jobs:
 
